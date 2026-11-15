@@ -157,6 +157,3 @@ export class ParseErrorImpl extends Error {
     this.protected = isProtected;
   }
 }
-
-
-export { detectFormat }
