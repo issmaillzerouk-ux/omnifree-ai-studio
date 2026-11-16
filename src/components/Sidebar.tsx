@@ -2,11 +2,11 @@
 // Sidebar — Navigation between Chat, Knowledge, Providers, Personas, Prompts
 // ============================================================================
 
-import { MessageSquare, Database, Settings2, Users, BookMarked, Moon, Sun, Languages } from 'lucide-react';
+import { MessageSquare, Database, Settings2, Users, BookMarked, Moon, Sun, Languages, HardDriveDownload } from 'lucide-react';
 import type { Translation } from '@/lib/i18n';
 import type { Language } from '@/types';
 
-export type SidebarView = 'chat' | 'knowledge' | 'providers' | 'personas' | 'prompts';
+export type SidebarView = 'chat' | 'knowledge' | 'providers' | 'personas' | 'prompts' | 'backup';
 
 interface SidebarProps {
   t: Translation;
@@ -25,6 +25,7 @@ const NAV_ITEMS: Array<{ view: SidebarView; icon: typeof MessageSquare; labelKey
   { view: 'providers', icon: Settings2, labelKey: 'providers' },
   { view: 'personas', icon: Users, labelKey: 'personas' },
   { view: 'prompts', icon: BookMarked, labelKey: 'promptLibrary' },
+  { view: 'backup', icon: HardDriveDownload, labelKey: 'dataBackup' },
 ];
 
 export function Sidebar({ t, dir, activeView, onViewChange, language, onToggleLanguage, theme, onToggleTheme }: SidebarProps) {

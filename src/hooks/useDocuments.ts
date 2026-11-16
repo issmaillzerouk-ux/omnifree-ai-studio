@@ -23,6 +23,7 @@ export interface UseDocumentsResult {
   removeDocument: (id: string) => Promise<void>;
   toggleEnabled: (id: string) => Promise<void>;
   clearError: () => void;
+  refresh: () => Promise<void>;
 }
 
 export function useDocuments(): UseDocumentsResult {
@@ -118,5 +119,6 @@ export function useDocuments(): UseDocumentsResult {
     removeDocument,
     toggleEnabled,
     clearError,
+    refresh,
   };
 }

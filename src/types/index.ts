@@ -108,3 +108,91 @@ export interface RagContext {
   snippets: string[];
   hasContext: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Workspace Backup (Phase 9)
+// ---------------------------------------------------------------------------
+
+export interface PersistedChatTurn {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  providerName?: string;
+  elapsedMs?: number;
+  ragUsed?: boolean;
+  error?: string;
+}
+
+export interface PersistedConversation {
+  id: string;
+  title: string;
+  turns: PersistedChatTurn[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SnapshotPersonas {
+  custom: SystemPersona[];
+  builtin: SystemPersona[];
+}
+
+export interface SnapshotProviders {
+  /** Providers with API keys stripped. */
+  safe: ProviderConfig[];
+  /** Providers including API keys — only present when the user opts in. */
+  withKeys?: ProviderConfig[];
+}
+
+export type WorkspaceSnapshotFormat = 'plain' | 'encrypted';
+
+export interface WorkspaceSnapshotHeader {
+  app: 'omnifree-ai-studio';
+  kind: 'workspace-snapshot';
+  schemaVersion: number;
+  format: WorkspaceSnapshotFormat;
+  createdAt: number;
+}
+
+export interface WorkspaceSnapshotData {
+  schemaVersion: number;
+  conversations: PersistedConversation[];
+  documents: DocumentRecord[];
+  chunks: DocumentChunk[];
+  personas: SnapshotPersonas;
+  prompts: PromptSnippet[];
+  providers: SnapshotProviders;
+  settings?: AppSettings;
+}
+
+/** Plain JSON snapshot written to disk (data section present unencrypted). */
+export interface WorkspaceSnapshotFile extends WorkspaceSnapshotHeader {
+  format: 'plain';
+  data: WorkspaceSnapshotData;
+}
+
+/** Encrypted snapshot — data is an opaque base64 payload (AES-GCM). */
+export interface EncryptedWorkspaceSnapshotFile extends WorkspaceSnapshotHeader {
+  format: 'encrypted';
+  salt: string;
+  iv: string;
+  data: string;
+}
+
+export type WorkspaceSnapshot = WorkspaceSnapshotFile | EncryptedWorkspaceSnapshotFile;
+
+export type RestoreMode = 'merge' | 'overwrite';
+
+export interface RestoreSummary {
+  conversationsAdded: number;
+  documentsAdded: number;
+  chunksAdded: number;
+  personasAdded: number;
+  promptsAdded: number;
+  providersAdded: number;
+  providersUpdated: number;
+}
+
+export interface StorageEstimateInfo {
+  usageBytes: number;
+  quotaBytes: number;
+}

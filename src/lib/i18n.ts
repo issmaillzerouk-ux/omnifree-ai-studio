@@ -75,6 +75,37 @@ export interface Translation {
   closePanel: string;
   searchPlaceholder: string;
   searchPrompt: string;
+  dataBackup: string;
+  backupDesc: string;
+  exportBackup: string;
+  importBackup: string;
+  includeApiKeys: string;
+  includeApiKeysDesc: string;
+  encryptBackup: string;
+  backupPassword: string;
+  backupPasswordDesc: string;
+  restoreMode: string;
+  mergeMode: string;
+  mergeModeDesc: string;
+  overwriteMode: string;
+  overwriteModeDesc: string;
+  dropBackupHere: string;
+  importing: string;
+  importSuccess: string;
+  importFailed: string;
+  invalidBackup: string;
+  wrongPassword: string;
+  storageUsed: string;
+  storageOf: string;
+  factoryReset: string;
+  factoryResetDesc: string;
+  factoryResetConfirm: string;
+  confirm: string;
+  cancel: string;
+  backupExported: string;
+  newerVersion: string;
+  addedItem: string;
+  updatedItem: string;
 }
 
 const en: Translation = {
@@ -148,6 +179,37 @@ const en: Translation = {
   closePanel: 'Close',
   searchPlaceholder: 'Search prompts…',
   searchPrompt: 'Search prompt',
+  dataBackup: 'Data & Backup',
+  backupDesc: 'Export or restore your entire workspace: chats, documents, personas, prompts and providers.',
+  exportBackup: 'Export Backup',
+  importBackup: 'Import Backup',
+  includeApiKeys: 'Include API keys in backup',
+  includeApiKeysDesc: 'Warning: your provider API keys will be written into the backup file in plain text. Only enable this if you store the file securely.',
+  encryptBackup: 'Encrypt backup with a password',
+  backupPassword: 'Backup password',
+  backupPasswordDesc: 'Uses AES-256 encryption. You will need this password to restore the backup.',
+  restoreMode: 'Restore mode',
+  mergeMode: 'Merge',
+  mergeModeDesc: 'Keep existing data and add new items from the backup.',
+  overwriteMode: 'Overwrite',
+  overwriteModeDesc: 'Erase all current data and replace it with the backup.',
+  dropBackupHere: 'Drop your .json backup here',
+  importing: 'Restoring…',
+  importSuccess: 'Backup restored successfully',
+  importFailed: 'Import failed',
+  invalidBackup: 'Invalid backup file',
+  wrongPassword: 'Wrong password or corrupted backup',
+  storageUsed: 'Storage used',
+  storageOf: 'of',
+  factoryReset: 'Factory Reset',
+  factoryResetDesc: 'Permanently delete all chats, documents, personas, prompts and provider keys from this browser.',
+  factoryResetConfirm: 'This will permanently delete ALL local data. This cannot be undone. Continue?',
+  confirm: 'Confirm',
+  cancel: 'Cancel',
+  backupExported: 'Backup file downloaded',
+  newerVersion: 'This backup was created by a newer app version',
+  addedItem: 'added',
+  updatedItem: 'updated',
 };
 
 const ar: Translation = {
@@ -221,6 +283,37 @@ const ar: Translation = {
   closePanel: 'إغلاق',
   searchPlaceholder: 'ابحث في الأوامر…',
   searchPrompt: 'البحث في الأوامر',
+  dataBackup: 'البيانات والنسخ الاحتياطي',
+  backupDesc: 'صدّر أو استعد مساحة عملك بالكامل: المحادثات، المستندات، الشخصيات، الأوامر والمزودين.',
+  exportBackup: 'تصدير نسخة احتياطية',
+  importBackup: 'استيراد نسخة احتياطية',
+  includeApiKeys: 'تضمين مفاتيح API في النسخة الاحتياطية',
+  includeApiKeysDesc: 'تحذير: ستُكتب مفاتيح API الخاصة بك في ملف النسخة الاحتياطية كنص صريح. فعّل هذا الخيار فقط إذا كنت تحفظ الملف في مكان آمن.',
+  encryptBackup: 'تشفير النسخة الاحتياطية بكلمة مرور',
+  backupPassword: 'كلمة مرور النسخة الاحتياطية',
+  backupPasswordDesc: 'يستخدم تشفير AES-256. ستحتاج إلى هذه الكلمة لاستعادة النسخة الاحتياطية.',
+  restoreMode: 'وضع الاستعادة',
+  mergeMode: 'دمج',
+  mergeModeDesc: 'الاحتفاظ بالبيانات الحالية وإضافة العناصر الجديدة من النسخة الاحتياطية.',
+  overwriteMode: 'استبدال',
+  overwriteModeDesc: 'حذف جميع البيانات الحالية واستبدالها بالنسخة الاحتياطية.',
+  dropBackupHere: 'أفلت ملف النسخة الاحتياطية .json هنا',
+  importing: 'جارٍ الاستعادة…',
+  importSuccess: 'تمت استعادة النسخة الاحتياطية بنجاح',
+  importFailed: 'فشل الاستيراد',
+  invalidBackup: 'ملف نسخة احتياطية غير صالح',
+  wrongPassword: 'كلمة مرور خاطئة أو نسخة احتياطية تالفة',
+  storageUsed: 'المساحة المستخدمة',
+  storageOf: 'من',
+  factoryReset: 'إعادة ضبط المصنع',
+  factoryResetDesc: 'حذف جميع المحادثات والمستندات والشخصيات والأوامر ومفاتيح المزودين من هذا المتصفح نهائيًا.',
+  factoryResetConfirm: 'سيتم حذف جميع البيانات المحلية نهائيًا. لا يمكن التراجع عن هذا الإجراء. هل تريد المتابعة؟',
+  confirm: 'تأكيد',
+  cancel: 'إلغاء',
+  backupExported: 'تم تنزيل ملف النسخة الاحتياطية',
+  newerVersion: 'تم إنشاء هذه النسخة الاحتياطية بإصدار أحدث من التطبيق',
+  addedItem: 'مضاف',
+  updatedItem: 'محدّث',
 };
 
 const translations: Record<Language, Translation> = { en, ar };

@@ -10,6 +10,7 @@ import { KnowledgePanel } from '@/components/KnowledgePanel';
 import { ProvidersPanel } from '@/components/ProvidersPanel';
 import { PersonasPanel } from '@/components/PersonasPanel';
 import { PromptsPanel } from '@/components/PromptsPanel';
+import { BackupSettings } from '@/components/BackupSettings';
 import { useChat } from '@/hooks/useChat';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useProviders } from '@/hooks/useProviders';
@@ -17,6 +18,8 @@ import { useSettings } from '@/hooks/useSettings';
 import { getTranslation } from '@/lib/i18n';
 import { loadPersonas, savePersonas, getPersonaById, loadPrompts, savePrompts } from '@/lib/personas';
 import { retrieveContext } from '@/lib/retrieval';
+import { clearAllConversations } from '@/lib/chatStore';
+import { clearAllDocuments } from '@/lib/documentStore';
 import type { SystemPersona, PromptSnippet } from '@/types';
 import { Database } from 'lucide-react';
 
@@ -114,6 +117,18 @@ export function App() {
       return next;
     });
   }, []);
+
+  const handleFactoryReset = useCallback(async (): Promise<void> => {
+    await clearAllConversations();
+    await clearAllDocuments();
+    localStorage.removeItem('omnifree-providers');
+    localStorage.removeItem('omnifree-personas');
+    localStorage.removeItem('omnifree-prompts');
+    localStorage.removeItem('omnifree-active-conversation');
+    setPersonas(loadPersonas());
+    setPrompts(loadPrompts());
+    await docs.refresh();
+  }, [docs]);
 
   const handleUsePrompt = useCallback((_body: string) => {
     setActiveView('chat');
@@ -216,6 +231,10 @@ export function App() {
             onRemove={handleRemovePrompt}
             onUse={handleUsePrompt}
           />
+        )}
+
+        {activeView === 'backup' && (
+          <BackupSettings t={t} dir={dir} onFactoryReset={handleFactoryReset} />
         )}
       </main>
     </div>
