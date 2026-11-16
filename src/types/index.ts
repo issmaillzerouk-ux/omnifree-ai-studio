@@ -11,6 +11,8 @@ export interface AppSettings {
   activeProviderId: string;
   activePersonaId: string;
   theme: 'light' | 'dark';
+  autoRotate: boolean;
+  manualProviderId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,8 +33,12 @@ export type ProviderRole = 'primary' | 'fallback';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | Array<ChatContentPart>;
 }
+
+export type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; imageUrl: string };
 
 export interface ProviderResponse {
   text: string;
@@ -75,7 +81,7 @@ export interface PromptSnippet {
 
 export type DocumentStatus = 'processing' | 'ready' | 'error';
 
-export type FileFormat = 'pdf' | 'docx' | 'txt' | 'md';
+export type FileFormat = 'pdf' | 'docx' | 'txt' | 'md' | 'pptx' | 'csv' | 'image';
 
 export interface DocumentChunk {
   id: string;

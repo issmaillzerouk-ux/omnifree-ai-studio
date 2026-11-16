@@ -106,6 +106,17 @@ export interface Translation {
   newerVersion: string;
   addedItem: string;
   updatedItem: string;
+  autoRotate: string;
+  manual: string;
+  attachedFile: string;
+  uploadPptx: string;
+  uploadPdf: string;
+  uploadDocText: string;
+  uploadImage: string;
+  insertPrompt: string;
+  parsingFile: string;
+  noActiveProvider: string;
+  imageAttached: string;
 }
 
 const en: Translation = {
@@ -210,6 +221,17 @@ const en: Translation = {
   newerVersion: 'This backup was created by a newer app version',
   addedItem: 'added',
   updatedItem: 'updated',
+  autoRotate: 'Auto',
+  manual: 'Manual',
+  attachedFile: 'Attached file',
+  uploadPptx: 'Upload Presentation (.pptx)',
+  uploadPdf: 'Upload PDF Document',
+  uploadDocText: 'Upload Word / Text / Data',
+  uploadImage: 'Upload Image (Vision / OCR)',
+  insertPrompt: 'Insert Prompt Template',
+  parsingFile: 'Parsing file…',
+  noActiveProvider: 'No active provider',
+  imageAttached: 'Image attached',
 };
 
 const ar: Translation = {
@@ -314,6 +336,17 @@ const ar: Translation = {
   newerVersion: 'تم إنشاء هذه النسخة الاحتياطية بإصدار أحدث من التطبيق',
   addedItem: 'مضاف',
   updatedItem: 'محدّث',
+  autoRotate: 'تلقائي',
+  manual: 'يدوي',
+  attachedFile: 'ملف مرفق',
+  uploadPptx: 'رفع عرض تقديمي (PowerPoint)',
+  uploadPdf: 'رفع مستند PDF',
+  uploadDocText: 'رفع Word / نص / بيانات',
+  uploadImage: 'رفع صورة (رؤية / OCR)',
+  insertPrompt: 'إدراج قالب أمر',
+  parsingFile: 'جارٍ تحليل الملف…',
+  noActiveProvider: 'لا يوجد مزود نشط',
+  imageAttached: 'صورة مرفقة',
 };
 
 const translations: Record<Language, Translation> = { en, ar };

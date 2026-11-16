@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage, ProviderResponse, ProviderConfig, SystemPersona, RagContext } from '@/types';
+import type { ChatMessage, ChatContentPart, ProviderResponse, ProviderConfig, SystemPersona, RagContext } from '@/types';
 import { sendChatWithFallback } from '@/lib/providers';
 import { retrieveContext, buildRagContextString } from '@/lib/retrieval';
 import { generateId } from '@/lib/documentStore';
@@ -23,12 +23,24 @@ export interface ChatTurn {
   pending?: boolean;
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  kind: 'text' | 'image';
+  /** Extracted text content for text-like files. */
+  text?: string;
+  /** Base64 data URL for images (vision). */
+  dataUrl?: string;
+}
+
 export interface UseChatOptions {
   providers: ProviderConfig[];
   persona: SystemPersona;
+  autoRotate: boolean;
+  manualProviderId?: string;
 }
 
-export function useChat({ providers, persona }: UseChatOptions) {
+export function useChat({ providers, persona, autoRotate, manualProviderId }: UseChatOptions) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -78,8 +90,9 @@ export function useChat({ providers, persona }: UseChatOptions) {
   }, [turns]);
 
   const sendMessage = useCallback(
-    async (userText: string): Promise<void> => {
-      if (!userText.trim() || isLoading) return;
+    async (userText: string, attachments: Attachment[] = []): Promise<void> => {
+      if (isLoading) return;
+      if (!userText.trim() && attachments.length === 0) return;
       setIsLoading(true);
 
       // RAG retrieval
@@ -95,10 +108,17 @@ export function useChat({ providers, persona }: UseChatOptions) {
         // RAG failure is non-fatal — proceed without context
       }
 
+      const attachmentNote = attachments.length > 0
+        ? `\n\n${attachments
+            .map((a) => (a.kind === 'text' ? `--- ${a.name} ---\n${a.text ?? ''}` : `[image: ${a.name}]`))
+            .join('\n\n')}`
+        : '';
+      const displayText = userText || attachments.map((a) => a.name).join(', ');
+
       const userTurn: ChatTurn = {
         id: `${Date.now()}-u`,
         role: 'user',
-        content: userText,
+        content: displayText + (attachments.some((a) => a.kind === 'image') ? ` [${t.imageAttached}]` : ''),
       };
       setTurns((prev) => [...prev, userTurn]);
 
@@ -107,10 +127,26 @@ export function useChat({ providers, persona }: UseChatOptions) {
         ? `${persona.systemPrompt}\n\n${ragContext}`
         : persona.systemPrompt;
 
+      // Attachments become part of the final user message content
+      const attachmentParts = attachments.map((a): ChatContentPart =>
+        a.kind === 'image' && a.dataUrl
+          ? { type: 'image', imageUrl: a.dataUrl }
+          : { type: 'text', text: `--- ${a.name} ---\n${a.text ?? ''}` },
+      );
+      const userContent: ChatMessage['content'] =
+        attachmentParts.length > 0
+          ? [...attachmentParts, ...(userText.trim() ? [{ type: 'text' as const, text: userText }] : [])]
+          : userText + attachmentNote;
+
+      const historyMessages: ChatMessage[] = turns.map((t) => ({
+        role: t.role,
+        content: t.content,
+      }));
+
       const messages: ChatMessage[] = [
         { role: 'system', content: systemContent },
-        ...turns.map((t): ChatMessage => ({ role: t.role, content: t.content })),
-        { role: 'user', content: userText },
+        ...historyMessages,
+        { role: 'user', content: userContent },
       ];
 
       const controller = new AbortController();
@@ -130,6 +166,9 @@ export function useChat({ providers, persona }: UseChatOptions) {
           providers,
           messages,
           controller.signal,
+          {
+            manualProviderId: autoRotate ? undefined : manualProviderId,
+          },
         );
         setTurns((prev) =>
           prev.map((t) =>
@@ -160,7 +199,7 @@ export function useChat({ providers, persona }: UseChatOptions) {
         abortRef.current = null;
       }
     },
-    [turns, providers, persona, isLoading],
+    [turns, providers, persona, isLoading, autoRotate, manualProviderId],
   );
 
   const stopGeneration = useCallback(() => {

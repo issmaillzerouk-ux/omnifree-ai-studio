@@ -12,6 +12,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   activeProviderId: '',
   activePersonaId: 'general-assistant',
   theme: 'light',
+  autoRotate: true,
+  manualProviderId: '',
 };
 
 export function useSettings() {

@@ -1,5 +1,5 @@
 // ============================================================================
-// App — OmniFree AI Studio (Phases 1-8)
+// App — OmniFree AI Studio (Phases 1-10)
 // ============================================================================
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -19,7 +19,10 @@ import { getTranslation } from '@/lib/i18n';
 import { loadPersonas, savePersonas, getPersonaById, loadPrompts, savePrompts } from '@/lib/personas';
 import { retrieveContext } from '@/lib/retrieval';
 import { clearAllConversations } from '@/lib/chatStore';
-import { clearAllDocuments } from '@/lib/documentStore';
+import { clearAllDocuments, saveDocument, saveChunks, generateId } from '@/lib/documentStore';
+import { detectFormat, parseFile, parseImage, ParseErrorImpl } from '@/lib/fileParsers';
+import { chunkText } from '@/lib/textChunker';
+import type { Attachment } from '@/hooks/useChat';
 import type { SystemPersona, PromptSnippet } from '@/types';
 import { Database } from 'lucide-react';
 
@@ -55,21 +58,32 @@ export function App() {
     [personas, settings.activePersonaId],
   );
 
+  const activeProviderId = useMemo(
+    () => providers.find((p) => p.enabled && p.apiKey.trim())?.id ?? '',
+    [providers],
+  );
+
   const { turns, isLoading, sendMessage, stopGeneration, clearChat } = useChat({
     providers,
     persona: activePersona,
+    autoRotate: settings.autoRotate,
+    manualProviderId: settings.manualProviderId,
   });
+
+  // Attachment parsing state (Phase 10)
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseProgress, setParseProgress] = useState(0);
+  const [parseFileName, setParseFileName] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
 
   // RAG status — check if any enabled documents exist
   const ragActive = docs.documents.some((d) => d.enabled && d.status === 'ready');
 
-  // Check RAG snippet count when documents change
   useEffect(() => {
     if (!ragActive) {
       setRagSnippetCount(0);
       return;
     }
-    // Get chunk count from enabled documents
     let count = 0;
     docs.documents
       .filter((d) => d.enabled && d.status === 'ready')
@@ -134,6 +148,101 @@ export function App() {
     setActiveView('chat');
   }, []);
 
+  // Attachment handling — parse, chip, optionally index into RAG (Phase 10)
+  const handleFilesSelected = useCallback(async (files: File[]): Promise<void> => {
+    for (const file of files) {
+      const format = detectFormat(file.name);
+      if (format === 'image') {
+        try {
+          const { dataUrl } = await parseImage(file);
+          setPendingAttachments((prev) => [
+            ...prev,
+            { id: generateId(), name: file.name, kind: 'image', dataUrl },
+          ]);
+        } catch (err) {
+          docs.setError(err instanceof Error ? err.message : 'Failed to read image');
+        }
+        continue;
+      }
+
+      setIsParsing(true);
+      setParseProgress(0);
+      setParseFileName(file.name);
+      try {
+        const result = await parseFile(file, (percent) => setParseProgress(percent));
+        setPendingAttachments((prev) => [
+          ...prev,
+          { id: generateId(), name: file.name, kind: 'text', text: result.text },
+        ]);
+        // Best-effort indexing into the local RAG store (disabled by default)
+        try {
+          const docId = generateId();
+          await saveDocument({
+            id: docId,
+            name: file.name,
+            format: result.format,
+            sizeBytes: file.size,
+            chunkCount: 0,
+            status: 'processing',
+            enabled: false,
+            uploadedAt: Date.now(),
+          });
+          const chunks = chunkText(result.text, docId);
+          if (chunks.length > 0) {
+            await saveChunks(chunks);
+            await saveDocument({
+              id: docId,
+              name: file.name,
+              format: result.format,
+              sizeBytes: file.size,
+              chunkCount: chunks.length,
+              status: 'ready',
+              enabled: false,
+              uploadedAt: Date.now(),
+            });
+          }
+        } catch {
+          // RAG indexing is best-effort; the attachment still works
+        }
+      } catch (err) {
+        const msg = err instanceof ParseErrorImpl
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to parse file';
+        docs.setError(msg);
+      } finally {
+        setIsParsing(false);
+        setParseProgress(0);
+        setParseFileName('');
+      }
+    }
+  }, [docs]);
+
+  const handleSendWithAttachments = useCallback(
+    (text: string, composerAttachments: Attachment[]) => {
+      const merged = [...pendingAttachments, ...composerAttachments];
+      setPendingAttachments([]);
+      void sendMessage(text, merged);
+    },
+    [pendingAttachments, sendMessage],
+  );
+
+  const handleToggleAutoRotate = useCallback(() => {
+    update({ autoRotate: !settings.autoRotate });
+  }, [settings.autoRotate, update]);
+
+  const handleSelectChatProvider = useCallback(
+    (id: string) => {
+      update({ manualProviderId: id, autoRotate: false });
+    },
+    [update],
+  );
+
+  const handleOpenPrompts = useCallback(() => {
+    setActiveView('prompts');
+  }, []);
+
   // Theme toggle
   const handleToggleTheme = useCallback(() => {
     update({ theme: settings.theme === 'dark' ? 'light' : 'dark' });
@@ -175,12 +284,24 @@ export function App() {
             <Composer
               t={t}
               dir={dir}
-              onSend={sendMessage}
+              providers={providers}
+              activeProviderId={settings.manualProviderId || activeProviderId}
+              autoRotate={settings.autoRotate}
+              onToggleAutoRotate={handleToggleAutoRotate}
+              onSelectProvider={handleSelectChatProvider}
+              onSend={handleSendWithAttachments}
               onStop={stopGeneration}
               onClear={clearChat}
               isLoading={isLoading}
+              isParsing={isParsing}
+              parseProgress={parseProgress}
+              parseFileName={parseFileName}
+              onFilesSelected={handleFilesSelected}
+              attachments={pendingAttachments}
+              onRemoveAttachment={(id) => setPendingAttachments((prev) => prev.filter((a) => a.id !== id))}
               ragActive={ragActive}
               ragSnippetCount={ragSnippetCount}
+              onOpenPrompts={handleOpenPrompts}
             />
           </>
         )}
