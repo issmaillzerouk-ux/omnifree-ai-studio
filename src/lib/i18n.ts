@@ -132,6 +132,43 @@ export interface Translation {
   or_chatgpt: string;
   or_gemini: string;
   or_deepseek: string;
+  connectedApps: string;
+  connectedAppsDesc: string;
+  connect: string;
+  connected: string;
+  disconnect: string;
+  getKey: string;
+  connectorKeyPlaceholder: string;
+  saveKey: string;
+  modeChat: string;
+  modeImage: string;
+  modeVideo: string;
+  aspectRatio: string;
+  videoMode: string;
+  aiVideo: string;
+  motionStoryboard: string;
+  generatingImage: string;
+  generatingStoryboard: string;
+  webContextJina: string;
+  webContextKnowledge: string;
+  webContextTavily: string;
+  downloadPng: string;
+  play: string;
+  pause: string;
+  narrationOn: string;
+  narrationOff: string;
+  downloadHtml: string;
+  sceneOf: string;
+  sendToAutomation: string;
+  sentToAutomation: string;
+  automationSent: string;
+  automationFailed: string;
+  exportGist: string;
+  gistCreated: string;
+  exportNotion: string;
+  notionCreated: string;
+  zeroKey: string;
+  portalKey: string;
 }
 
 const en: Translation = {
@@ -262,6 +299,43 @@ const en: Translation = {
   or_chatgpt: 'ChatGPT',
   or_gemini: 'Gemini',
   or_deepseek: 'DeepSeek',
+  connectedApps: 'Connected Apps',
+  connectedAppsDesc: 'One-click web services, media engines and automations. Zero-key services are pre-connected.',
+  connect: 'Connect',
+  connected: 'Connected ✓',
+  disconnect: 'Disconnect',
+  getKey: 'Get Key ↗',
+  connectorKeyPlaceholder: 'Paste key or URL…',
+  saveKey: 'Connect',
+  modeChat: 'Chat / Web',
+  modeImage: 'Generate Image',
+  modeVideo: 'Generate Video',
+  aspectRatio: 'Aspect ratio',
+  videoMode: 'Video mode',
+  aiVideo: 'AI Video',
+  motionStoryboard: 'Narrated Motion Storyboard',
+  generatingImage: 'Generating image…',
+  generatingStoryboard: 'Directing storyboard…',
+  webContextJina: 'Web read',
+  webContextKnowledge: 'Knowledge',
+  webContextTavily: 'Web search',
+  downloadPng: 'Download PNG',
+  play: 'Play',
+  pause: 'Pause',
+  narrationOn: 'Voice on',
+  narrationOff: 'Voice off',
+  downloadHtml: 'Download Motion HTML',
+  sceneOf: 'Scene',
+  sendToAutomation: 'Send to Automation',
+  sentToAutomation: 'Send to Automation',
+  automationSent: 'Sent to automation ✓',
+  automationFailed: 'Automation failed',
+  exportGist: 'Export to GitHub',
+  gistCreated: 'Gist created — check your GitHub',
+  exportNotion: 'Send to Notion',
+  notionCreated: 'Page created in Notion',
+  zeroKey: 'Zero-key',
+  portalKey: 'Key required',
 };
 
 const ar: Translation = {
@@ -392,6 +466,43 @@ const ar: Translation = {
   or_chatgpt: 'ChatGPT',
   or_gemini: 'Gemini',
   or_deepseek: 'DeepSeek',
+  connectedApps: 'التطبيقات المتصلة',
+  connectedAppsDesc: 'خدمات ويب ومحركات وسائط وأتمتة بنقرة واحدة. الخدمات بدون مفتاح متصلة مسبقًا.',
+  connect: 'اتصال',
+  connected: 'متصل ✓',
+  disconnect: 'قطع الاتصال',
+  getKey: 'احصل على مفتاح ↗',
+  connectorKeyPlaceholder: 'الصق المفتاح أو الرابط…',
+  saveKey: 'اتصال',
+  modeChat: 'محادثة / ويب',
+  modeImage: 'توليد صورة',
+  modeVideo: 'توليد فيديو',
+  aspectRatio: 'نسبة العرض',
+  videoMode: 'وضع الفيديو',
+  aiVideo: 'فيديو ذكاء اصطناعي',
+  motionStoryboard: 'لوحة حركة سرديّة',
+  generatingImage: 'جارٍ توليد الصورة…',
+  generatingStoryboard: 'جارٍ إخراج اللوحة…',
+  webContextJina: 'قراءة ويب',
+  webContextKnowledge: 'معرفة',
+  webContextTavily: 'بحث ويب',
+  downloadPng: 'تنزيل PNG',
+  play: 'تشغيل',
+  pause: 'إيقاف مؤقت',
+  narrationOn: 'الصوت مفعّل',
+  narrationOff: 'الصوت متوقف',
+  downloadHtml: 'تنزيل HTML متحرك',
+  sceneOf: 'مشهد',
+  sendToAutomation: 'إرسال إلى الأتمتة',
+  sentToAutomation: 'إرسال إلى الأتمتة',
+  automationSent: 'تم الإرسال إلى الأتمتة ✓',
+  automationFailed: 'فشلت الأتمتة',
+  exportGist: 'تصدير إلى GitHub',
+  gistCreated: 'تم إنشاء Gist — تحقق من GitHub',
+  exportNotion: 'إرسال إلى Notion',
+  notionCreated: 'تم إنشاء الصفحة في Notion',
+  zeroKey: 'بدون مفتاح',
+  portalKey: 'يتطلب مفتاحًا',
 };
 
 const translations: Record<Language, Translation> = { en, ar };

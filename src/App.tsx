@@ -1,5 +1,5 @@
 // ============================================================================
-// App — OmniFree AI Studio (Phases 1-10)
+// App — OmniFree AI Studio (Phases 1-10B)
 // ============================================================================
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
@@ -10,6 +10,7 @@ import { KnowledgePanel } from '@/components/KnowledgePanel';
 import { ProvidersPanel } from '@/components/ProvidersPanel';
 import { PersonasPanel } from '@/components/PersonasPanel';
 import { PromptsPanel } from '@/components/PromptsPanel';
+import { ConnectorsPanel } from '@/components/ConnectorsPanel';
 import { BackupSettings } from '@/components/BackupSettings';
 import { useChat } from '@/hooks/useChat';
 import { useDocuments } from '@/hooks/useDocuments';
@@ -22,9 +23,21 @@ import { clearAllConversations } from '@/lib/chatStore';
 import { clearAllDocuments, saveDocument, saveChunks, generateId } from '@/lib/documentStore';
 import { detectFormat, parseFile, parseImage, ParseErrorImpl } from '@/lib/fileParsers';
 import { chunkText } from '@/lib/textChunker';
+import {
+  loadConnectorState,
+  saveConnectorState,
+  sendToAutomation,
+  exportToGist,
+  exportToNotion,
+  isConnectorConnected,
+  type ConnectorId,
+} from '@/lib/connectors';
+import type { MediaMode, AspectRatio, VideoMode } from '@/lib/mediaGenerator';
 import type { Attachment } from '@/hooks/useChat';
 import type { SystemPersona, PromptSnippet } from '@/types';
 import { Database } from 'lucide-react';
+
+const DEFAULT_CONNECTORS = loadConnectorState();
 
 export function App() {
   const { settings, update, toggleLanguage } = useSettings();
@@ -34,6 +47,12 @@ export function App() {
   const [personas, setPersonas] = useState<SystemPersona[]>([]);
   const [prompts, setPrompts] = useState<PromptSnippet[]>([]);
   const [ragSnippetCount, setRagSnippetCount] = useState(0);
+  const [connectorState, setConnectorState] = useState(DEFAULT_CONNECTORS);
+
+  // Media generation mode (Phase 10B)
+  const [mediaMode, setMediaMode] = useState<MediaMode>('chat');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
+  const [videoMode, setVideoMode] = useState<VideoMode>('motion-storyboard');
 
   // Load personas & prompts
   useEffect(() => {
@@ -68,7 +87,25 @@ export function App() {
     persona: activePersona,
     autoRotate: settings.autoRotate,
     manualProviderId: settings.manualProviderId,
+    connectorState,
   });
+
+  // Connector handlers (Phase 10B)
+  const handleToggleConnector = useCallback((id: ConnectorId, connected: boolean) => {
+    setConnectorState((prev) => {
+      const next = { ...prev, connected: { ...prev.connected, [id]: connected } };
+      saveConnectorState(next);
+      return next;
+    });
+  }, []);
+
+  const handleSaveConnectorKey = useCallback((id: ConnectorId, key: string) => {
+    setConnectorState((prev) => {
+      const next = { ...prev, keys: { ...prev.keys, [id]: key } };
+      saveConnectorState(next);
+      return next;
+    });
+  }, []);
 
   // Attachment parsing state (Phase 10)
   const [isParsing, setIsParsing] = useState(false);
@@ -223,10 +260,40 @@ export function App() {
     (text: string, composerAttachments: Attachment[]) => {
       const merged = [...pendingAttachments, ...composerAttachments];
       setPendingAttachments([]);
-      void sendMessage(text, merged);
+      void sendMessage(text, merged, {
+        mediaMode,
+        aspect: aspectRatio,
+        videoMode,
+        language: settings.language,
+      });
     },
-    [pendingAttachments, sendMessage],
+    [pendingAttachments, sendMessage, mediaMode, aspectRatio, videoMode, settings.language],
   );
+
+  // Response action handlers (Phase 10B)
+  const handleSendToAutomation = useCallback(async (text: string): Promise<void> => {
+    const webhook = connectorState.keys.automation;
+    if (!isConnectorConnected(connectorState, 'automation') || !webhook) {
+      throw new Error('Automation webhook not connected');
+    }
+    await sendToAutomation(webhook, { text });
+  }, [connectorState]);
+
+  const handleExportGist = useCallback(async (text: string): Promise<string> => {
+    const token = connectorState.keys.github;
+    if (!isConnectorConnected(connectorState, 'github') || !token) {
+      throw new Error('GitHub not connected');
+    }
+    return exportToGist(token, 'omnifree-export.md', text);
+  }, [connectorState]);
+
+  const handleExportNotion = useCallback(async (text: string): Promise<string> => {
+    const token = connectorState.keys.notion;
+    if (!isConnectorConnected(connectorState, 'notion') || !token) {
+      throw new Error('Notion not connected');
+    }
+    return exportToNotion(token, 'OmniFree AI Studio Note', text);
+  }, [connectorState]);
 
   const handleToggleAutoRotate = useCallback(() => {
     update({ autoRotate: !settings.autoRotate });
@@ -280,7 +347,16 @@ export function App() {
                 </div>
               )}
             </div>
-            <ChatView t={t} dir={dir} turns={turns} personaName={activePersona.name} />
+            <ChatView
+              t={t}
+              dir={dir}
+              language={settings.language}
+              turns={turns}
+              personaName={activePersona.name}
+              onSendToAutomation={handleSendToAutomation}
+              onExportGist={handleExportGist}
+              onExportNotion={handleExportNotion}
+            />
             <Composer
               t={t}
               dir={dir}
@@ -302,6 +378,12 @@ export function App() {
               ragActive={ragActive}
               ragSnippetCount={ragSnippetCount}
               onOpenPrompts={handleOpenPrompts}
+              mediaMode={mediaMode}
+              onMediaModeChange={setMediaMode}
+              aspectRatio={aspectRatio}
+              onAspectRatioChange={setAspectRatio}
+              videoMode={videoMode}
+              onVideoModeChange={setVideoMode}
             />
           </>
         )}
@@ -328,6 +410,16 @@ export function App() {
             onUpdate={updateProvider}
             onAdd={addProvider}
             onRemove={removeProvider}
+          />
+        )}
+
+        {activeView === 'connectors' && (
+          <ConnectorsPanel
+            t={t}
+            dir={dir}
+            state={connectorState}
+            onToggle={handleToggleConnector}
+            onSaveKey={handleSaveConnectorKey}
           />
         )}
 

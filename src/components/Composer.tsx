@@ -13,6 +13,8 @@ import type { Translation } from '@/lib/i18n';
 import type { ProviderConfig } from '@/types';
 import { getDefinition } from '@/lib/providers';
 import type { Attachment } from '@/hooks/useChat';
+import type { MediaMode, AspectRatio, VideoMode } from '@/lib/mediaGenerator';
+import { Image as ImageIcon2, Film, MessageSquare, Globe } from 'lucide-react';
 
 interface ComposerProps {
   t: Translation;
@@ -35,6 +37,12 @@ interface ComposerProps {
   ragActive: boolean;
   ragSnippetCount: number;
   onOpenPrompts: () => void;
+  mediaMode: MediaMode;
+  onMediaModeChange: (mode: MediaMode) => void;
+  aspectRatio: AspectRatio;
+  onAspectRatioChange: (ratio: AspectRatio) => void;
+  videoMode: VideoMode;
+  onVideoModeChange: (mode: VideoMode) => void;
 }
 
 type PlusMenuAction = 'pptx' | 'pdf' | 'docs' | 'image' | 'prompt';
@@ -51,6 +59,7 @@ export function Composer({
   onSelectProvider, onSend, onStop, onClear, isLoading, isParsing,
   parseProgress, parseFileName, onFilesSelected, attachments, onRemoveAttachment,
   ragActive, ragSnippetCount, onOpenPrompts,
+  mediaMode, onMediaModeChange, aspectRatio, onAspectRatioChange, videoMode, onVideoModeChange,
 }: ComposerProps) {
   const [text, setText] = useState('');
   const [plusOpen, setPlusOpen] = useState(false);
@@ -122,8 +131,84 @@ export function Composer({
     { action: 'prompt', icon: BookMarked, label: t.insertPrompt },
   ];
 
+  const MODE_ITEMS: Array<{ mode: MediaMode; icon: typeof MessageSquare; label: string }> = [
+    { mode: 'chat', icon: MessageSquare, label: t.modeChat },
+    { mode: 'image', icon: ImageIcon2, label: t.modeImage },
+    { mode: 'video', icon: Film, label: t.modeVideo },
+  ];
+
   return (
     <div dir={dir} className="border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3">
+      {/* Media generation mode selector pill (Phase 10B) */}
+      <div className="flex items-center justify-between mb-2 px-1 gap-2 flex-wrap">
+        <div className="inline-flex items-center rounded-full bg-neutral-100 dark:bg-neutral-800 p-0.5">
+          {MODE_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = mediaMode === item.mode;
+            return (
+              <button
+                key={item.mode}
+                onClick={() => onMediaModeChange(item.mode)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary-500 text-white shadow-sm'
+                    : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {item.label}
+              </button>
+            );
+          })}
+          {mediaMode === 'chat' && <Globe className="w-3 h-3 text-neutral-400 ms-1 me-1" />}
+        </div>
+
+        {mediaMode === 'image' && (
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">{t.aspectRatio}</span>
+            {(['1:1', '16:9', '9:16'] as AspectRatio[]).map((ratio) => (
+              <button
+                key={ratio}
+                onClick={() => onAspectRatioChange(ratio)}
+                className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                  aspectRatio === ratio
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                }`}
+              >
+                {ratio}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mediaMode === 'video' && (
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">{t.videoMode}</span>
+            <button
+              onClick={() => onVideoModeChange('ai-video')}
+              className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                videoMode === 'ai-video'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+              }`}
+            >
+              {t.aiVideo}
+            </button>
+            <button
+              onClick={() => onVideoModeChange('motion-storyboard')}
+              className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                videoMode === 'motion-storyboard'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+              }`}
+            >
+              {t.motionStoryboard}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* RAG status + provider pill row */}
       <div className="flex items-center justify-between mb-2 px-1 gap-2">
         <div className="flex items-center gap-2 text-xs min-w-0">

@@ -58,3 +58,13 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Ken Burns motion used by the StoryboardPlayer (Phase 10B) */
+@keyframes omnifree-kenburns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.12) translate(2%, -2%);
+  }
+}

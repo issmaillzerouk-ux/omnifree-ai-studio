@@ -31,6 +31,23 @@ export interface ProviderConfig {
 
 export type ProviderRole = 'primary' | 'fallback';
 
+// ---------------------------------------------------------------------------
+// Multimodal Media Studio (Phase 10B)
+// ---------------------------------------------------------------------------
+
+import type { StoryboardScene } from '@/lib/mediaGenerator';
+
+export type TurnMedia =
+  | { kind: 'image'; url: string; prompt: string; providerName: string }
+  | { kind: 'storyboard'; titleEn: string; titleAr: string; scenes: StoryboardScene[] }
+  | { kind: 'video-status'; status: string; detail: string };
+
+export interface WebContextBadge {
+  jinaUrls: string[];
+  knowledgeCount: number;
+  tavilyUsed: boolean;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string | Array<ChatContentPart>;
