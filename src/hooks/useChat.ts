@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ChatContentPart, ProviderResponse, ProviderConfig, SystemPersona, RagContext } from '@/types';
-import { sendChatWithFallback } from '@/lib/providers';
+import { sendChatWithFallback } from '@/lib/router';
 import { retrieveContext, buildRagContextString } from '@/lib/retrieval';
 import { generateId } from '@/lib/documentStore';
 import { saveConversation } from '@/lib/chatStore';

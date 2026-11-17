@@ -117,6 +117,21 @@ export interface Translation {
   parsingFile: string;
   noActiveProvider: string;
   imageAttached: string;
+  getKey: string;
+  testSaveKey: string;
+  keyValid: string;
+  keyInvalid: string;
+  syncModelsNow: string;
+  lastSync: string;
+  neverSynced: string;
+  healthyProviders: string;
+  openRouterGateway: string;
+  oneKeyAllModels: string;
+  or_all: string;
+  or_claude: string;
+  or_chatgpt: string;
+  or_gemini: string;
+  or_deepseek: string;
 }
 
 const en: Translation = {
@@ -232,6 +247,21 @@ const en: Translation = {
   parsingFile: 'Parsing file…',
   noActiveProvider: 'No active provider',
   imageAttached: 'Image attached',
+  getKey: 'Get API Key',
+  testSaveKey: 'Test & Save Key',
+  keyValid: 'Key valid',
+  keyInvalid: 'Key invalid',
+  syncModelsNow: 'Sync Models Now',
+  lastSync: 'Last sync',
+  neverSynced: 'never',
+  healthyProviders: 'healthy providers',
+  openRouterGateway: 'OpenRouter Unified Gateway',
+  oneKeyAllModels: 'one key, all Claude / GPT / Gemini / DeepSeek free models',
+  or_all: 'All Free',
+  or_claude: 'Claude',
+  or_chatgpt: 'ChatGPT',
+  or_gemini: 'Gemini',
+  or_deepseek: 'DeepSeek',
 };
 
 const ar: Translation = {
@@ -347,6 +377,21 @@ const ar: Translation = {
   parsingFile: 'جارٍ تحليل الملف…',
   noActiveProvider: 'لا يوجد مزود نشط',
   imageAttached: 'صورة مرفقة',
+  getKey: 'احصل على مفتاح API',
+  testSaveKey: 'اختبار وحفظ المفتاح',
+  keyValid: 'المفتاح صالح',
+  keyInvalid: 'المفتاح غير صالح',
+  syncModelsNow: 'مزامنة النماذج الآن',
+  lastSync: 'آخر مزامنة',
+  neverSynced: 'أبدًا',
+  healthyProviders: 'مزودون سليمون',
+  openRouterGateway: 'بوابة OpenRouter الموحدة',
+  oneKeyAllModels: 'مفتاح واحد، كل نماذج Claude / GPT / Gemini / DeepSeek المجانية',
+  or_all: 'كل المجانية',
+  or_claude: 'Claude',
+  or_chatgpt: 'ChatGPT',
+  or_gemini: 'Gemini',
+  or_deepseek: 'DeepSeek',
 };
 
 const translations: Record<Language, Translation> = { en, ar };
