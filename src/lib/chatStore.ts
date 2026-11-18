@@ -59,6 +59,16 @@ export async function saveConversations(convos: PersistedConversation[]): Promis
   });
 }
 
+export async function deleteConversation(id: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(CONVO_STORE, 'readwrite');
+    transaction.objectStore(CONVO_STORE).delete(id);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
 export async function clearAllConversations(): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {

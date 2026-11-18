@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, Zap, ZapOff, ExternalLink, RefreshCw, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import type { Translation } from '@/lib/i18n';
 import type { ProviderConfig } from '@/types';
-import { getDefinition, syncAllProviders, startLiveModelSyncEngine } from '@/lib/providers';
+import { getDefinition, syncProviderModels, syncAllProviders, startLiveModelSyncEngine } from '@/lib/providers';
 import { getSyncMeta, getRecentLogs, type RouterLogEntry } from '@/lib/apiKeyStore';
 
 interface ProvidersPanelProps {
@@ -48,6 +48,25 @@ export function ProvidersPanel({ t, dir, providers, onUpdate, onAdd, onRemove }:
 
   // OpenRouter category tabs
   const [orTab, setOrTab] = useState<OpenRouterTab>('all');
+
+  // OmniRoute Gateway card state
+  const omniRoute = providers.find((p) => p.id === 'omniroute-default');
+  const [omniRouteState, setOmniRouteState] = useState<'idle' | 'syncing' | 'connected' | 'offline'>('idle');
+  const [omniRouteModels, setOmniRouteModels] = useState<string[]>([]);
+
+  const handleOmniRouteSync = useCallback(async () => {
+    if (!omniRoute) return;
+    setOmniRouteState('syncing');
+    const models = await syncProviderModels(omniRoute);
+    if (models) {
+      setOmniRouteModels(models);
+      setOmniRouteState('connected');
+      onUpdate(omniRoute.id, { enabled: true });
+    } else {
+      setOmniRouteState('offline');
+    }
+    await refreshSyncStatus();
+  }, [omniRoute, onUpdate, refreshSyncStatus]);
 
   const refreshSyncStatus = useCallback(async () => {
     const [meta, logs] = await Promise.all([getSyncMeta(), getRecentLogs(5)]);
@@ -157,6 +176,96 @@ export function ProvidersPanel({ t, dir, providers, onUpdate, onAdd, onRemove }:
           </ul>
         )}
       </div>
+
+      {/* OmniRoute Gateway — prominent local gateway card */}
+      {omniRoute && (
+        <div className="rounded-xl border-2 border-primary-300 dark:border-primary-700 bg-primary-50/60 dark:bg-primary-950/20 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-bold text-primary-700 dark:text-primary-300">{omniRoute.name}</span>
+              {omniRouteState === 'connected' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-success-500 text-white px-2 py-0.5 text-xs font-medium flex-shrink-0">
+                  <CheckCircle2 className="w-3 h-3" /> Connected ✓
+                </span>
+              )}
+              {omniRouteState === 'offline' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-error-500 text-white px-2 py-0.5 text-xs font-medium flex-shrink-0">
+                  <XCircle className="w-3 h-3" /> Offline
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => onUpdate(omniRoute.id, { enabled: !omniRoute.enabled })}
+              className={`
+                relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0
+                ${omniRoute.enabled ? 'bg-primary-500' : 'bg-neutral-300 dark:bg-neutral-600'}
+              `}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${omniRoute.enabled ? 'translate-x-4' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={omniRoute.baseUrl}
+              onChange={(e) => onUpdate(omniRoute.id, { baseUrl: e.target.value })}
+              placeholder="http://localhost:20128/v1"
+              className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-primary-400 transition-colors"
+            />
+            <button
+              onClick={() => onUpdate(omniRoute.id, { baseUrl: 'http://localhost:20128/v1' })}
+              className="rounded-full px-2.5 py-1 text-xs font-medium transition-colors flex-shrink-0 bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60"
+            >
+              Local (:20128)
+            </button>
+            <button
+              onClick={() => onUpdate(omniRoute.id, { baseUrl: 'https://' })}
+              className="rounded-full px-2.5 py-1 text-xs font-medium transition-colors flex-shrink-0 bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+            >
+              Custom URL
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="password"
+              value={omniRoute.apiKey === 'local' ? '' : omniRoute.apiKey}
+              onChange={(e) => onUpdate(omniRoute.id, { apiKey: e.target.value })}
+              placeholder="API key (optional)"
+              className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 px-3 py-1.5 text-sm focus:outline-none focus:border-primary-400 transition-colors"
+            />
+            <button
+              onClick={() => void handleOmniRouteSync()}
+              disabled={omniRouteState === 'syncing'}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 flex-shrink-0"
+            >
+              {omniRouteState === 'syncing'
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <RefreshCw className="w-3.5 h-3.5" />}
+              Sync & Connect
+            </button>
+          </div>
+
+          {omniRouteModels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {omniRouteModels.map((model) => (
+                <button
+                  key={model}
+                  onClick={() => onUpdate(omniRoute.id, { model })}
+                  className={`rounded-lg px-2 py-1 text-xs font-mono transition-colors ${
+                    omniRoute.model === model
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:border-primary-400'
+                  }`}
+                >
+                  {model}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {enabledCount > 0 ? (
         <div className="flex items-center gap-2 rounded-xl bg-success-50 dark:bg-success-950/30 border border-success-200 dark:border-success-800 px-3 py-2">

@@ -30,9 +30,23 @@ export interface ProviderDefinition {
   freeTier: boolean;
   /** Live /models discovery supported? */
   liveDiscovery: boolean;
+  /** Works with no API key at all. */
+  zeroKey?: boolean;
 }
 
 export const PROVIDER_CATALOG: ProviderDefinition[] = [
+  {
+    id: 'omniroute-default',
+    name: 'OmniRoute Gateway',
+    baseUrl: 'http://localhost:20128/v1',
+    model: 'auto',
+    models: ['auto', 'claude-sonnet-4-6', 'claude-opus-4-6', 'gemini-3.8-flash', 'gpt-4.1', 'deepseek-chat'],
+    signupUrl: '',
+    flavor: 'openai',
+    freeTier: true,
+    liveDiscovery: true,
+    zeroKey: true,
+  },
   {
     id: 'gemini-default',
     name: 'Google Gemini',
@@ -82,11 +96,11 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
 const STORAGE_KEY = 'omnifree-providers';
 
 function fromDefinition(d: ProviderDefinition): ProviderConfig {
-  const isKeyless = d.id === 'pollinations-default';
+  const isKeyless = d.zeroKey === true || d.id === 'pollinations-default';
   return {
     id: d.id,
     name: d.name,
-    apiKey: isKeyless ? 'pollinations-free' : '',
+    apiKey: isKeyless ? 'local' : '',
     baseUrl: d.baseUrl,
     model: d.model,
     enabled: isKeyless,
@@ -191,18 +205,21 @@ function extractModelIds(provider: ProviderConfig, payload: unknown): string[] {
  */
 export async function syncProviderModels(provider: ProviderConfig): Promise<string[] | null> {
   const definition = getDefinition(provider.id);
-  if (!definition?.liveDiscovery || !provider.apiKey.trim()) return null;
+  if (!definition?.liveDiscovery) return null;
+  const hasKey = provider.apiKey.trim().length > 0;
+  // Keyless gateways (OmniRoute, Pollinations) sync without a key
+  if (!hasKey && !definition.zeroKey && !provider.id.startsWith('pollinations')) return null;
 
   let url: string;
   const headers: Record<string, string> = {};
   if (provider.id.startsWith('gemini')) {
     url = `${provider.baseUrl}/models`;
-    headers['x-goog-api-key'] = provider.apiKey;
+    if (hasKey) headers['x-goog-api-key'] = provider.apiKey;
   } else if (provider.id.startsWith('openrouter')) {
     url = 'https://openrouter.ai/api/v1/models'; // public, unauthenticated
   } else {
     url = `${provider.baseUrl}/models`;
-    headers.Authorization = `Bearer ${provider.apiKey}`;
+    if (hasKey) headers.Authorization = `Bearer ${provider.apiKey}`;
   }
 
   try {
@@ -289,16 +306,17 @@ export function startLiveModelSyncEngine(getProviders: () => ProviderConfig[]): 
 /** Test an API key by hitting the provider's cheapest authenticated endpoint. */
 export async function testProviderKey(provider: ProviderConfig): Promise<boolean> {
   const definition = getDefinition(provider.id);
-  if (!provider.apiKey.trim()) return false;
+  const isKeyless = definition?.zeroKey === true || provider.id.startsWith('pollinations');
+  if (!isKeyless && !provider.apiKey.trim()) return false;
   try {
     if (definition?.flavor === 'gemini') {
       const response = await fetch(`${provider.baseUrl}/models`, {
-        headers: { 'x-goog-api-key': provider.apiKey },
+        headers: provider.apiKey.trim() ? { 'x-goog-api-key': provider.apiKey } : {},
       });
       return response.ok;
     }
     const response = await fetch(`${provider.baseUrl}/models`, {
-      headers: { Authorization: `Bearer ${provider.apiKey}` },
+      headers: provider.apiKey.trim() ? { Authorization: `Bearer ${provider.apiKey}` } : {},
     });
     return response.ok;
   } catch {

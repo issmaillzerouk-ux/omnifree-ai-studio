@@ -193,6 +193,19 @@ async function callProvider(
   if (definition?.flavor === 'gemini') {
     return callGemini(provider, messages, signal);
   }
+  // OmniRoute is a local gateway — hard 15s timeout so failover kicks in fast
+  if (provider.id.startsWith('omniroute')) {
+    const timeoutController = new AbortController();
+    const timer = window.setTimeout(() => timeoutController.abort(), 15_000);
+    const onOuterAbort = () => timeoutController.abort();
+    signal.addEventListener('abort', onOuterAbort, { once: true });
+    try {
+      return await callOpenAICompatible(provider, messages, timeoutController.signal);
+    } finally {
+      window.clearTimeout(timer);
+      signal.removeEventListener('abort', onOuterAbort);
+    }
+  }
   return callOpenAICompatible(provider, messages, signal);
 }
 
@@ -288,7 +301,7 @@ export async function sendChatWithFallback(
   let lastError: ProviderError | null = null;
 
   for (let i = 0; i < ordered.length; i++) {
-    const provider = ordered[i];
+    let provider = ordered[i];
 
     // Skip providers whose current model is already known dead — swap first
     if (await isModelDead(provider.id, provider.model)) {
