@@ -54,11 +54,15 @@ async function callOpenAICompatible(
   signal: AbortSignal,
 ): Promise<ProviderResponse> {
   const start = performance.now();
-  const url = `${provider.baseUrl}/chat/completions`;
+  const isPollinations = provider.id.startsWith('pollinations');
+  // Pollinations exposes a single POST endpoint (no /chat/completions suffix)
+  const url = isPollinations ? provider.baseUrl : `${provider.baseUrl}/chat/completions`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${provider.apiKey}`,
   };
+  if (!isPollinations) {
+    headers.Authorization = `Bearer ${provider.apiKey}`;
+  }
   if (provider.id.startsWith('anthropic')) {
     headers['anthropic-version'] = '2023-06-01';
     headers['anthropic-dangerous-direct-browser-access'] = 'true';

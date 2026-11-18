@@ -1,15 +1,17 @@
 // ============================================================================
-// useChat — Chat hook with RAG, web context & multimodal media (Phases 8-10B)
+// useChat — Chat hook with intent orchestration, web context, multimodal
+// media, document export actions and persistent sessions (Phases 8-10C)
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage, ChatContentPart, ProviderResponse, ProviderConfig, SystemPersona, RagContext, WebContextBadge, TurnMedia } from '@/types';
+import type {
+  ChatMessage, ChatContentPart, ProviderResponse, ProviderConfig, SystemPersona,
+  WebContextBadge, TurnMedia, PersistedConversation,
+} from '@/types';
 import { sendChatWithFallback } from '@/lib/router';
 import { retrieveContext, buildRagContextString } from '@/lib/retrieval';
 import { generateId } from '@/lib/documentStore';
-import { saveConversation } from '@/lib/chatStore';
-import type { PersistedConversation } from '@/types';
-import type { Attachment } from '@/hooks/useChat';
+import { saveConversation, getAllConversations, deleteConversation } from '@/lib/chatStore';
 import type { MediaMode, AspectRatio, VideoMode, GeneratedImage, Storyboard } from '@/lib/mediaGenerator';
 import { generateImage, generateStoryboard } from '@/lib/mediaGenerator';
 import {
@@ -19,7 +21,12 @@ import {
   fetchViaJina,
   searchOpenKnowledge,
   tavilySearch,
+  searchGptGrounding,
+  findRealPhotos,
+  type ConnectorId,
 } from '@/lib/connectors';
+import { detectIntent, translateToEnglishVisualPrompt, detectPromptLanguage } from '@/lib/intentRouter';
+import type { ExportFormat } from '@/lib/docExport';
 
 const CONVO_STORAGE_KEY = 'omnifree-active-conversation';
 
@@ -35,17 +42,30 @@ export interface ChatTurn {
   media?: TurnMedia;
   mediaStatus?: string;
   webContext?: WebContextBadge;
+  /** One-click PPTX / DOCX / PDF export actions on document responses. */
+  exportActions?: ExportFormat[];
 }
 
-export interface UseChatOptions {
-  providers: ProviderConfig[];
-  persona: SystemPersona;
-  autoRotate: boolean;
-  manualProviderId?: string;
-  connectorState: {
-    connected: Partial<Record<'pollinations' | 'jina' | 'openscience' | 'tts' | 'tavily' | 'huggingface' | 'automation' | 'github' | 'notion' | 'custom', boolean>>;
-    keys: Partial<Record<'pollinations' | 'jina' | 'openscience' | 'tts' | 'tavily' | 'huggingface' | 'automation' | 'github' | 'notion' | 'custom', string>>;
-  };
+export interface Attachment {
+  id: string;
+  name: string;
+  kind: 'text' | 'image';
+  text?: string;
+  dataUrl?: string;
+  /** Extraction stats shown on the chip. */
+  charCount?: number;
+  pageCount?: number;
+}
+
+export interface ConnectorState {
+  connected: Partial<Record<ConnectorId, boolean>>;
+  keys: Partial<Record<ConnectorId, string>>;
+}
+
+export interface SessionSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
 }
 
 export interface SendMediaOptions {
@@ -53,6 +73,14 @@ export interface SendMediaOptions {
   aspect: AspectRatio;
   videoMode: VideoMode;
   language: 'en' | 'ar';
+}
+
+export interface UseChatOptions {
+  providers: ProviderConfig[];
+  persona: SystemPersona;
+  autoRotate: boolean;
+  manualProviderId?: string;
+  connectorState: ConnectorState;
 }
 
 function updateTurn(
@@ -65,13 +93,70 @@ function updateTurn(
 
 export function useChat({ providers, persona, autoRotate, manualProviderId, connectorState }: UseChatOptions) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const convoIdRef = useRef<string>(generateId());
   const connectorRef = useRef(connectorState);
   connectorRef.current = connectorState;
 
+  // -------------------------------------------------------------------------
+  // Session management — recent chats list (Phase 10C)
+  // -------------------------------------------------------------------------
+  const refreshSessions = useCallback(async (): Promise<void> => {
+    try {
+      const all = await getAllConversations();
+      setSessions(
+        all
+          .filter((c) => c.turns.length > 0)
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, 30)
+          .map((c) => ({ id: c.id, title: c.title || 'Conversation', updatedAt: c.updatedAt })),
+      );
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshSessions();
+  }, [refreshSessions, turns]);
+
+  const loadSession = useCallback((convo: PersistedConversation): void => {
+    convoIdRef.current = convo.id;
+    localStorage.setItem(CONVO_STORAGE_KEY, JSON.stringify(convo));
+    setTurns(
+      convo.turns.map((t) => ({
+        id: t.id,
+        role: t.role,
+        content: t.content,
+        providerName: t.providerName,
+        elapsedMs: t.elapsedMs,
+        ragUsed: t.ragUsed,
+        error: t.error,
+      })),
+    );
+  }, []);
+
+  const newSession = useCallback((): void => {
+    convoIdRef.current = generateId();
+    localStorage.setItem(
+      CONVO_STORAGE_KEY,
+      JSON.stringify({ id: convoIdRef.current, title: '', turns: [], createdAt: Date.now(), updatedAt: Date.now() }),
+    );
+    setTurns([]);
+  }, []);
+
+  const deleteSession = useCallback((id: string): void => {
+    void deleteConversation(id).then(() => refreshSessions());
+    if (convoIdRef.current === id) {
+      newSession();
+    }
+  }, [newSession, refreshSessions]);
+
+  // -------------------------------------------------------------------------
   // Autosave the active conversation whenever turns settle (Phase 9)
+  // -------------------------------------------------------------------------
   useEffect(() => {
     const finished = turns.filter((t) => !t.pending);
     if (finished.length === 0) return;
@@ -112,7 +197,7 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
     });
   }, [turns]);
 
-  /** Single-shot LLM call used by the storyboard director. */
+  /** Single-shot LLM call used by the storyboard director and translator. */
   const callLLM = useCallback(async (prompt: string): Promise<string> => {
     const controller = new AbortController();
     abortRef.current = controller;
@@ -128,7 +213,7 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
   }, [providers, persona]);
 
   // -------------------------------------------------------------------------
-  // Web context enrichment (chat mode) — Jina reader + Open Knowledge + Tavily
+  // Web context — Jina reader + Open Knowledge + Tavily + SearchGPT
   // -------------------------------------------------------------------------
   const buildWebContext = useCallback(async (userText: string): Promise<{ badge: WebContextBadge; context: string }> => {
     const state = connectorRef.current;
@@ -175,6 +260,17 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
       }
     }
 
+    if (sections.length === 0 && userText.trim().length > 2 && isConnectorConnected(state, 'searchgpt')) {
+      try {
+        const grounding = await searchGptGrounding(userText);
+        if (grounding) {
+          sections.push(`--- SearchGPT web grounding ---\n${grounding}`);
+        }
+      } catch {
+        // grounding failure is non-fatal
+      }
+    }
+
     return { badge, context: sections.join('\n\n') };
   }, []);
 
@@ -184,8 +280,7 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
       if (!userText.trim() && attachments.length === 0) return;
       setIsLoading(true);
 
-      const mode: MediaMode = media?.mediaMode ?? 'chat';
-      const language = media?.language ?? 'en';
+      const language = detectPromptLanguage(userText);
 
       const userTurn: ChatTurn = {
         id: `${Date.now()}-u`,
@@ -207,78 +302,75 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
       abortRef.current = controller;
 
       try {
-        // --------------------------------------------------------------
-        // Image generation mode
-        // --------------------------------------------------------------
-        if (mode === 'image') {
-          updateTurn(setTurns, assistantId, { mediaStatus: language === 'ar' ? 'جارٍ توليد الصورة…' : 'Generating image…' });
+        const attachmentText = attachments
+          .filter((a) => a.kind === 'text' && a.text)
+          .map((a) => `--- Attached file: ${a.name} (${a.charCount ?? a.text.length} characters) ---\n${a.text}`)
+          .join('\n\n');
+        const imageAttachments = attachments.filter((a) => a.kind === 'image' && a.dataUrl);
+
+        // ------------------------------------------------------------
+        // INTENT DETECTION — orchestrates the pipeline (Phase 10C)
+        // ------------------------------------------------------------
+        const intent = detectIntent(userText);
+
+        // IMAGE intent — Nano Banana (Gemini native image) + Flux HD via key,
+        // guaranteed Pollinations fallback, Wikimedia/Openverse for real photos
+        if (intent.intent === 'image' && imageAttachments.length === 0) {
+          updateTurn(setTurns, assistantId, {
+            mediaStatus: language === 'ar' ? 'جارٍ توليد الصورة…' : 'Generating image…',
+          });
+
+          const visualPrompt = await translateToEnglishVisualPrompt(callLLM, userText);
           const state = connectorRef.current;
-          const image: GeneratedImage = await generateImage(userText, {
+
+          if (intent.wantsRealPhotos && isConnectorConnected(state, 'photofinder')) {
+            const photos = await findRealPhotos(visualPrompt);
+            if (photos.length > 0) {
+              updateTurn(setTurns, assistantId, {
+                content: visualPrompt,
+                media: { kind: 'image', url: photos[0].url, prompt: visualPrompt, providerName: photos[0].source },
+                pending: false,
+              });
+              return;
+            }
+          }
+
+          const image: GeneratedImage = await generateImage(visualPrompt, {
             aspect: media?.aspect ?? '1:1',
             huggingFaceKey: getConnectorKey(state, 'huggingface') || undefined,
             pollinationsConnected: isConnectorConnected(state, 'pollinations'),
           });
           updateTurn(setTurns, assistantId, {
-            content: userText,
-            media: { kind: 'image', url: image.url, prompt: userText, providerName: image.providerName },
+            content: visualPrompt,
+            media: { kind: 'image', url: image.url, prompt: visualPrompt, providerName: image.providerName },
             pending: false,
           });
           return;
         }
 
-        // --------------------------------------------------------------
-        // Video / motion storyboard mode
-        // --------------------------------------------------------------
-        if (mode === 'video') {
-          const state = connectorRef.current;
-          const wantStoryboard = media?.videoMode === 'motion-storyboard' || !getConnectorKey(state, 'huggingface');
-
-          if (wantStoryboard) {
-            updateTurn(setTurns, assistantId, {
-              mediaStatus: language === 'ar' ? 'جارٍ إخراج اللوحة…' : 'Directing storyboard…',
-            });
-            const storyboard: Storyboard = await generateStoryboard(callLLM, userText, {
-              aspect: media?.aspect ?? '16:9',
-              huggingFaceKey: getConnectorKey(state, 'huggingface') || undefined,
-              pollinationsConnected: isConnectorConnected(state, 'pollinations'),
-              language,
-            });
-            updateTurn(setTurns, assistantId, {
-              content: language === 'ar' ? storyboard.titleAr : storyboard.titleEn,
-              media: { kind: 'storyboard', ...storyboard },
-              pending: false,
-            });
-            return;
-          }
-
-          // Cloud text-to-video attempt with async polling states
-          const hfKey = getConnectorKey(state, 'huggingface');
-          updateTurn(setTurns, assistantId, { mediaStatus: 'queued' });
-          const response = await fetch(
-            'https://router.huggingface.co/hf-inference/models/FRAMEWORK/mochi-1-preview',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hfKey}` },
-              body: JSON.stringify({ inputs: userText }),
-              signal: controller.signal,
-            },
-          );
-          if (!response.ok) throw new Error(`AI video failed (HTTP ${response.status})`);
-          updateTurn(setTurns, assistantId, { mediaStatus: 'processing' });
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
+        // VIDEO intent — narrated motion storyboard engine
+        if (intent.intent === 'video') {
           updateTurn(setTurns, assistantId, {
-            content: userText,
-            media: { kind: 'image', url, prompt: userText, providerName: 'Hugging Face Video' },
-            mediaStatus: 'completed',
+            mediaStatus: language === 'ar' ? 'جارٍ إخراج اللوحة…' : 'Directing storyboard…',
+          });
+          const state = connectorRef.current;
+          const storyboard: Storyboard = await generateStoryboard(callLLM, userText, {
+            aspect: media?.aspect ?? '16:9',
+            huggingFaceKey: getConnectorKey(state, 'huggingface') || undefined,
+            pollinationsConnected: isConnectorConnected(state, 'pollinations'),
+            language: language === 'ar' ? 'ar' : 'en',
+          });
+          updateTurn(setTurns, assistantId, {
+            content: language === 'ar' ? storyboard.titleAr : storyboard.titleEn,
+            media: { kind: 'storyboard', ...storyboard },
             pending: false,
           });
           return;
         }
 
-        // --------------------------------------------------------------
-        // Chat / Web mode — RAG + live web context
-        // --------------------------------------------------------------
+        // ------------------------------------------------------------
+        // CHAT / WEB / DOCUMENT — context-enriched LLM response
+        // ------------------------------------------------------------
         let ragContext = '';
         let ragUsed = false;
         try {
@@ -293,26 +385,22 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
 
         const web = await buildWebContext(userText);
 
-        const attachmentNote = attachments.length > 0
-          ? `\n\n${attachments
-              .map((a) => (a.kind === 'text' ? `--- ${a.name} ---\n${a.text ?? ''}` : `[image: ${a.name}]`))
-              .join('\n\n')}`
-          : '';
-
-        const contextBlocks = [ragContext, web.context].filter(Boolean).join('\n\n');
+        const contextBlocks = [ragContext, attachmentText, web.context].filter(Boolean).join('\n\n');
         const systemContent = contextBlocks
           ? `${persona.systemPrompt}\n\n${contextBlocks}`
           : persona.systemPrompt;
 
-        const attachmentParts = attachments.map((a): ChatContentPart =>
-          a.kind === 'image' && a.dataUrl
-            ? { type: 'image', imageUrl: a.dataUrl }
-            : { type: 'text', text: `--- ${a.name} ---\n${a.text ?? ''}` },
-        );
+        const attachmentParts: ChatContentPart[] = imageAttachments.map((a) => ({
+          type: 'image' as const,
+          imageUrl: a.dataUrl ?? '',
+        }));
         const userContent: ChatMessage['content'] =
           attachmentParts.length > 0
-            ? [...attachmentParts, ...(userText.trim() ? [{ type: 'text' as const, text: userText }] : [])]
-            : userText + attachmentNote;
+            ? [
+                ...attachmentParts,
+                { type: 'text' as const, text: userText + (attachmentText ? `\n\n${attachmentText}` : '') },
+              ]
+            : userText;
 
         const historyMessages: ChatMessage[] = turns.map((t) => ({
           role: t.role,
@@ -333,12 +421,17 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
             manualProviderId: autoRotate ? undefined : manualProviderId,
           },
         );
+
+        const exportActions: ExportFormat[] | undefined =
+          intent.intent === 'document' ? ['pptx', 'docx', 'pdf'] : undefined;
+
         updateTurn(setTurns, assistantId, {
           content: response.text,
           providerName: response.providerName,
           elapsedMs: response.elapsedMs,
           ragUsed,
           webContext: web.badge,
+          exportActions,
           pending: false,
         });
       } catch (err: unknown) {
@@ -365,7 +458,10 @@ export function useChat({ providers, persona, autoRotate, manualProviderId, conn
     setTurns([]);
   }, []);
 
-  return { turns, isLoading, sendMessage, stopGeneration, clearChat };
+  return {
+    turns, isLoading, sendMessage, stopGeneration, clearChat,
+    sessions, loadSession, newSession, deleteSession,
+  };
 }
 
 export type { Attachment };

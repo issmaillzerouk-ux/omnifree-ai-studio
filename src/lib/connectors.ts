@@ -8,6 +8,8 @@ export type ConnectorId =
   | 'jina'
   | 'openscience'
   | 'tts'
+  | 'photofinder'
+  | 'searchgpt'
   | 'tavily'
   | 'huggingface'
   | 'automation'
@@ -43,6 +45,18 @@ export const CONNECTOR_CATALOG: ConnectorDefinition[] = [
     id: 'openscience',
     name: 'Open Knowledge & Science Search',
     description: 'Live encyclopedic facts (Wikipedia) and academic papers (arXiv, Semantic Scholar) enrich the AI context automatically.',
+    zeroKey: true,
+  },
+  {
+    id: 'photofinder',
+    name: 'Live Web Photo Finder',
+    description: 'Finds real, freely-licensed photos on Wikimedia & Openverse when the user asks for real photography.',
+    zeroKey: true,
+  },
+  {
+    id: 'searchgpt',
+    name: 'SearchGPT Web Grounding',
+    description: 'Free web-grounded answers via the Pollinations SearchGPT model — zero key required.',
     zeroKey: true,
   },
   {
@@ -116,7 +130,7 @@ interface ConnectorState {
 
 const STATE_KEY = 'omnifree-connectors';
 
-const ZERO_KEY_DEFAULTS: ConnectorId[] = ['pollinations', 'jina', 'openscience', 'tts'];
+const ZERO_KEY_DEFAULTS: ConnectorId[] = ['pollinations', 'jina', 'openscience', 'tts', 'photofinder', 'searchgpt'];
 
 export function loadConnectorState(): ConnectorState {
   try {
@@ -245,6 +259,87 @@ export async function tavilySearch(key: string, query: string): Promise<string> 
   const data = (await response.json()) as TavilyResponse;
   const parts = (data.results ?? []).map((r) => `- ${r.title ?? 'Result'}: ${(r.content ?? '').slice(0, 300)}`);
   return [data.answer, ...parts].filter(Boolean).join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Live Web Photo Finder — Wikimedia Commons + Openverse
+// ---------------------------------------------------------------------------
+
+export interface FoundPhoto {
+  url: string;
+  title: string;
+  source: string;
+}
+
+interface CommonsResponse {
+  query?: {
+    pages?: Record<string, { title?: string; imageinfo?: Array<{ url?: string }> }>;
+  };
+}
+
+interface OpenverseResponse {
+  results?: Array<{ url?: string; title?: string; source?: string }>;
+}
+
+export async function findRealPhotos(query: string, limit = 3): Promise<FoundPhoto[]> {
+  const photos: FoundPhoto[] = [];
+
+  try {
+    const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=filetype:bitmap%20${encodeURIComponent(query)}&gsrlimit=${limit}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+    const response = await fetch(commonsUrl);
+    if (response.ok) {
+      const data = (await response.json()) as CommonsResponse;
+      for (const page of Object.values(data.query?.pages ?? {})) {
+        const info = page.imageinfo?.[0];
+        if (info?.url) {
+          photos.push({ url: info.url, title: page.title ?? 'Photo', source: 'Wikimedia Commons' });
+        }
+      }
+    }
+  } catch {
+    // non-fatal
+  }
+
+  try {
+    const openverseUrl = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=${limit}`;
+    const response = await fetch(openverseUrl);
+    if (response.ok) {
+      const data = (await response.json()) as OpenverseResponse;
+      for (const hit of data.results ?? []) {
+        if (hit.url) {
+          photos.push({ url: hit.url, title: hit.title ?? 'Photo', source: hit.source ?? 'Openverse' });
+        }
+      }
+    }
+  } catch {
+    // non-fatal
+  }
+
+  return photos.slice(0, limit);
+}
+
+// ---------------------------------------------------------------------------
+// SearchGPT — web-grounded answers via the free Pollinations gateway
+// ---------------------------------------------------------------------------
+
+interface PollinationsChatResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+}
+
+export async function searchGptGrounding(query: string): Promise<string> {
+  const response = await fetch('https://text.pollinations.ai/openai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'searchgpt',
+      messages: [{ role: 'user', content: query }],
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`SearchGPT failed (HTTP ${response.status})`);
+  }
+  const data = (await response.json()) as PollinationsChatResponse;
+  return data.choices?.[0]?.message?.content ?? '';
 }
 
 // ---------------------------------------------------------------------------

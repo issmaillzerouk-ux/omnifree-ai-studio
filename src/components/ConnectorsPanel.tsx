@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useState } from 'react';
-import { ExternalLink, Link2, Check, Loader2, Puzzle, Image as ImageIcon, Globe, GraduationCap, Volume2, Search, Workflow, Github, FileText, Wrench } from 'lucide-react';
+import { ExternalLink, Link2, Check, Loader2, Puzzle, Image as ImageIcon, Globe, GraduationCap, Volume2, Search, SearchCheck, Camera, Workflow, Github, FileText, Wrench } from 'lucide-react';
 import type { Translation } from '@/lib/i18n';
 import {
   CONNECTOR_CATALOG,
@@ -30,6 +30,8 @@ const CONNECTOR_ICONS: Record<ConnectorId, typeof Globe> = {
   jina: Globe,
   openscience: GraduationCap,
   tts: Volume2,
+  photofinder: Camera,
+  searchgpt: SearchCheck,
   tavily: Search,
   huggingface: Puzzle,
   automation: Workflow,
